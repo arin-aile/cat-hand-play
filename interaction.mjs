@@ -33,3 +33,21 @@ export class FingerContactTracker {
   }
   reset() { this.lastHits.clear(); }
 }
+
+// Joint geometry works for upright, sideways and mirrored hands.
+export function extendedFingers(landmarks) {
+  if (!landmarks || landmarks.length < 21) return [];
+  const vector = (a,b) => [b.x-a.x,b.y-a.y,(b.z||0)-(a.z||0)];
+  const length = v => Math.hypot(...v);
+  return TIP_IDS.filter(tip => {
+    const mcp=landmarks[tip-3], pip=landmarks[tip-2], end=landmarks[tip];
+    const lower=vector(mcp,pip), upper=vector(pip,end);
+    const a=length(lower), b=length(upper);
+    if (a<1e-8 || b<1e-8) return false;
+    const alignment=lower.reduce((sum,v,i)=>sum+v*upper[i],0)/(a*b);
+    return alignment>.45 && length(vector(mcp,end))>a*1.35;
+  });
+}
+export function gestureCount(landmarks, contactCount) {
+  return contactCount>0 ? extendedFingers(landmarks).length : 0;
+}

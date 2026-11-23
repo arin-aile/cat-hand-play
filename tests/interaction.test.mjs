@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { contactTips, videoToScreen, ContactGate, FingerContactTracker } from '../interaction.mjs';
+import { contactTips, videoToScreen, ContactGate, FingerContactTracker, extendedFingers, gestureCount } from '../interaction.mjs';
 test('one hand independently detects 0–4 fingertips, excluding thumb',()=>{
  for(let n=0;n<=4;n++){
   const lm=Array.from({length:21},()=>({x:-100,y:-100}));lm[4]={x:10,y:10};
@@ -37,4 +37,28 @@ test('independent contacts survive brief gaps and expire after release',()=>{
  assert.equal(tracker.update([8,12,16],130).length,3);
  assert.equal(tracker.update([],251).length,0);
  tracker.update([8],300);tracker.reset();assert.equal(tracker.update([],301).length,0);
+});
+
+function hand(count) {
+ const lm=Array.from({length:21},()=>({x:0,y:0,z:0}));
+ [8,12,16,20].forEach((tip,i)=>{
+  lm[tip-3]={x:i*.2,y:0,z:0};lm[tip-2]={x:i*.2,y:-.3,z:0};
+  lm[tip-1]={x:i*.2,y:i<count?-.5:-.2,z:0};
+  lm[tip]={x:i*.2,y:i<count?-.7:-.1,z:0};
+ });return lm;
+}
+test('one touching fingertip selects 1–4 extended fingers; no contact stays inactive',()=>{
+ for(let count=0;count<=4;count++){
+  assert.equal(extendedFingers(hand(count)).length,count);
+  assert.equal(gestureCount(hand(count),1),count);
+  assert.equal(gestureCount(hand(count),0),0);
+ }
+ assert.equal(gestureCount([],1),0);
+});
+test('extended-finger count survives rotation, mirroring and depth rotation',()=>{
+ for(let count=1;count<=4;count++){
+  const lm=hand(count);
+  for(const transform of [p=>({x:-p.x,y:p.y,z:p.z}),p=>({x:p.y,y:-p.x,z:0}),p=>({x:p.x,y:0,z:p.y})])
+   assert.equal(gestureCount(lm.map(transform),1),count);
+ }
 });

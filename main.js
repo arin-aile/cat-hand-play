@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-import { TIP_IDS, videoToScreen, contactTips, ContactGate, FingerContactTracker } from './interaction.mjs?v=5';
+import { TIP_IDS, videoToScreen, contactTips, gestureCount, ContactGate, FingerContactTracker } from './interaction.mjs?v=6';
 
 const el = Object.fromEntries(['camera','hands','stage','emotion','begin','status'].map(id => [id, document.getElementById(id)]));
 const ctx = el.hands.getContext('2d');
@@ -166,7 +166,8 @@ function processHands(results, now) {
     if (contacts.length) lastContact = contacts.map(id=>points[id]).reduce((a,p)=>({x:a.x+p.x/contacts.length,y:a.y+p.y/contacts.length}),{x:0,y:0});
   }
   if (!lm) fingerContacts.reset();
-  const reaction = gate.update(contacts.length,now);
+  const count = gestureCount(results.worldLandmarks?.[0] || lm, contacts.length);
+  const reaction = gate.update(count,now);
   if (reaction) setMode(reaction,true);
   return contacts.length;
 }
