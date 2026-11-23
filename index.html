@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+<meta name="theme-color" content="#ffffff" />
+<title>Cat Hand Play</title>
+<style>
+  * {box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#fff}
+  #camera,#stage,#hands{position:fixed;inset:0;width:100%;height:100%}
+  #camera{object-fit:cover;transform:scaleX(-1);opacity:.115;filter:grayscale(1) contrast(.76) brightness(1.35)}
+  #stage{z-index:1;pointer-events:none}#stage canvas{display:block;width:100%;height:100%}#hands{z-index:2;pointer-events:none;opacity:.40}
+  #emotion{z-index:3;position:fixed;top:18%;left:50%;transform:translate(-50%,-50%) scale(.7);font-size:clamp(26px,4vw,38px);pointer-events:none;opacity:0;transition:opacity .22s,transform .25s;filter:drop-shadow(0 4px 6px #0001)}
+  #emotion.visible{opacity:1;transform:translate(-50%,-50%) scale(1)}
+  #begin{position:fixed;z-index:5;inset:0;border:0;background:transparent;cursor:pointer;touch-action:manipulation}
+  #begin:focus-visible{outline:3px solid #999;outline-offset:-6px}
+  #startIcon{position:absolute;left:50%;bottom:12%;transform:translateX(-50%);width:64px;height:64px;border-radius:50%;display:grid;place-items:center;background:#ffffffda;box-shadow:0 5px 30px #00000012;font-size:33px}
+  #status{position:fixed;z-index:6;left:50%;bottom:6%;transform:translateX(-50%);font:14px system-ui,sans-serif;color:#595959;background:#fffffff0;padding:9px 16px;border-radius:24px;display:none;width:max-content;max-width:90vw;text-align:center}
+  @media(prefers-reduced-motion:reduce){#emotion{transition:none}}
+</style>
+</head>
+<body>
+<video id="camera" autoplay muted playsinline></video>
+<canvas id="hands" aria-hidden="true"></canvas>
+<div id="stage" aria-hidden="true"></div>
+<div id="emotion" aria-hidden="true"></div>
+<button id="begin" aria-label="카메라를 켜고 고양이와 놀기"><span id="startIcon">🐾</span></button>
+<div id="status" role="status"></div>
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"}}</script>
+<script>
+if (location.protocol === 'file:') {
+  document.querySelector('#begin').style.display = 'none';
+  const status = document.querySelector('#status');
+  status.textContent = '파일을 직접 열면 실행되지 않아요. ';
+  const link = document.createElement('a');
+  link.href = 'https://arin-aile.github.io/cat-hand-play/';
+  link.textContent = '배포된 고양이 앱 열기';
+  status.appendChild(link);
+  status.style.display = 'block';
+} else {
+  import('./main.js?v=4').catch(error => {
+    console.error(error);
+    const status = document.querySelector('#status');
+    status.textContent = '앱을 불러오지 못했어요. 인터넷 연결을 확인하고 새로고침해 주세요.';
+    status.style.display = 'block';
+  });
+}
+</script>
+</body>
+</html>
