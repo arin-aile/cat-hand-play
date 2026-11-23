@@ -41,7 +41,8 @@ function fit() {
   camera.updateProjectionMatrix(); camera.updateMatrixWorld();
   el.hands.width = Math.round(width*dpr); el.hands.height = Math.round(height*dpr);
   ctx.setTransform(dpr,0,0,dpr,0,0);
-  catPixels = clamp(Math.min(width,height)*.23,80,155) * 1.8975;
+  // Visible size: about 1.5x the previous rendered cat, with portrait safety.
+  catPixels = Math.min(height * .15, width * .38);
   facing.scale.setScalar(catPixels / height * 10);
   limitPosition(position); limitPosition(target);
 }
@@ -53,13 +54,15 @@ function limitPosition(p) {
 window.addEventListener('resize',fit); fit();
 
 new GLTFLoader().load('./cat.glb', gltf => {
-  cat = gltf.scene; normalized.add(cat);
+  // Measure in model space BEFORE attaching to scaled/rotated display groups.
+  cat = gltf.scene;
   cat.updateMatrixWorld(true);
   bounds.setFromObject(cat,true);
   const size = bounds.getSize(new THREE.Vector3()), center = bounds.getCenter(new THREE.Vector3());
   const scale = 1 / Math.max(size.x,size.y,size.z);
   normalized.scale.setScalar(scale);
   cat.position.sub(center);
+  normalized.add(cat);
   cat.traverse(o => { if (o.isMesh) { o.frustumCulled = false; meshes.push(o); } });
   mixer = new THREE.AnimationMixer(cat);
   for (const clip of gltf.animations) actions[clip.name] = mixer.clipAction(clip);
