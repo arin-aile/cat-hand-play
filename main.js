@@ -41,7 +41,7 @@ function fit() {
   camera.updateProjectionMatrix(); camera.updateMatrixWorld();
   el.hands.width = Math.round(width*dpr); el.hands.height = Math.round(height*dpr);
   ctx.setTransform(dpr,0,0,dpr,0,0);
-  catPixels = clamp(Math.min(width,height)*.23,80,155) * 1.265;
+  catPixels = clamp(Math.min(width,height)*.23,80,155) * 1.8975;
   facing.scale.setScalar(catPixels / height * 10);
   limitPosition(position); limitPosition(target);
 }
