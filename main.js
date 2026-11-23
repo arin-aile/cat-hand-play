@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-import { TIP_IDS, videoToScreen, contactTips, ContactGate } from './interaction.mjs';
+import { TIP_IDS, videoToScreen, contactTips, ContactGate, FingerContactTracker } from './interaction.mjs?v=5';
 
 const el = Object.fromEntries(['camera','hands','stage','emotion','begin','status'].map(id => [id, document.getElementById(id)]));
 const ctx = el.hands.getContext('2d');
@@ -19,6 +19,7 @@ scene.add(anchor); anchor.add(facing); facing.add(normalized);
 facing.rotation.x = .22;
 let cat, mixer, current, landmarker, stream;
 const actions = {}, meshes = [], bounds = new THREE.Box3(), raycaster = new THREE.Raycaster();
+const fingerContacts = new FingerContactTracker();
 const gate = new ContactGate(), clock = new THREE.Clock();
 let width = innerWidth, height = innerHeight, mode = 'rest', special = false, elapsed = 0, duration = 2;
 let started = false, starting = false, lastVideoTime = -1, lastDetection = 0, lastAttempt = 0;
@@ -37,7 +38,7 @@ function fit() {
   camera.updateProjectionMatrix(); camera.updateMatrixWorld();
   el.hands.width = Math.round(width*dpr); el.hands.height = Math.round(height*dpr);
   ctx.setTransform(dpr,0,0,dpr,0,0);
-  catPixels = clamp(Math.min(width,height)*.23,80,155);
+  catPixels = clamp(Math.min(width,height)*.23,80,155) * 1.15;
   facing.scale.setScalar(catPixels / height * 10);
   limitPosition(position); limitPosition(target);
 }
@@ -140,9 +141,9 @@ function screenRect() {
 // Empty corners of the projected bounding box do not count as contact.
 function hitsCat(p) {
   if (!cat || p.x<0 || p.x>width || p.y<0 || p.y>height) return false;
-  const r = screenRect(), pad = 12;
+  const r = screenRect(), pad = clamp(catPixels*.1,12,18);
   if (p.x<r.left-pad || p.x>r.right+pad || p.y<r.top-pad || p.y>r.bottom+pad) return false;
-  for (const [dx,dy] of [[0,0],[-9,0],[9,0],[0,-9],[0,9],[-6,-6],[6,-6],[-6,6],[6,6]]) {
+  for (const [dx,dy] of [[0,0],[-pad,0],[pad,0],[0,-pad],[0,pad],[-pad*.7,-pad*.7],[pad*.7,-pad*.7],[-pad*.7,pad*.7],[pad*.7,pad*.7]]) {
     raycaster.setFromCamera(new THREE.Vector2((p.x+dx)/width*2-1,1-(p.y+dy)/height*2),camera);
     if (raycaster.intersectObjects(meshes,false).length) return true;
   }
@@ -155,7 +156,7 @@ function processHands(results, now) {
   let contacts = [];
   if (lm && cat) {
     const points = lm.map(projectLandmark);
-    contacts = contactTips(lm,projectLandmark,hitsCat);
+    contacts = fingerContacts.update(contactTips(lm,projectLandmark,hitsCat),now);
     ctx.lineWidth=1.7; ctx.strokeStyle='rgba(92,104,120,.45)';
     for (const [i,j] of bonePairs) { ctx.beginPath();ctx.moveTo(points[i].x,points[i].y);ctx.lineTo(points[j].x,points[j].y);ctx.stroke(); }
     points.forEach((p,id) => {
@@ -164,6 +165,7 @@ function processHands(results, now) {
     });
     if (contacts.length) lastContact = contacts.map(id=>points[id]).reduce((a,p)=>({x:a.x+p.x/contacts.length,y:a.y+p.y/contacts.length}),{x:0,y:0});
   }
+  if (!lm) fingerContacts.reset();
   const reaction = gate.update(contacts.length,now);
   if (reaction) setMode(reaction,true);
   return contacts.length;
@@ -203,13 +205,13 @@ function animate() {
     try { processHands(landmarker.detectForVideo(el.camera,now),now); lastDetection=now; }
     catch (error) { console.error(error); stopCamera();showStatus('손 인식이 중단됐어요. 발바닥을 눌러 다시 시작해 주세요.'); }
   }
-  if (started && now-lastDetection>350) { ctx.clearRect(0,0,width,height);gate.reset(); }
+  if (started && now-lastDetection>350) { ctx.clearRect(0,0,width,height);gate.reset();fingerContacts.reset(); }
 }
 animate();
 function stopCamera() {
   started=false; stream?.getTracks().forEach(track=>track.stop());stream=null;
   landmarker?.close();landmarker=null;el.camera.srcObject=null;
-  ctx.clearRect(0,0,width,height);gate.reset();el.begin.style.display='block';el.begin.disabled=false;
+  ctx.clearRect(0,0,width,height);gate.reset();fingerContacts.reset();el.begin.style.display='block';el.begin.disabled=false;
 }
 async function start() {
   if (started || starting) return;
@@ -232,7 +234,7 @@ async function start() {
 }
 el.begin.addEventListener('click',start);
 window.addEventListener('pagehide',stopCamera);
-document.addEventListener('visibilitychange',()=>{clock.getDelta();gate.reset();ctx.clearRect(0,0,width,height);});
+document.addEventListener('visibilitychange',()=>{clock.getDelta();gate.reset();fingerContacts.reset();ctx.clearRect(0,0,width,height);});
 // Opt-in test harness; absent during normal use and never enables the camera.
 if (new URLSearchParams(location.search).has('test')) window.catTest = {
   get ready(){return !!cat;}, setMode, tick, processHands, hitsCat, screenRect,

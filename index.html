@@ -38,7 +38,7 @@ if (location.protocol === 'file:') {
   status.appendChild(link);
   status.style.display = 'block';
 } else {
-  import('./main.js?v=4').catch(error => {
+  import('./main.js?v=5').catch(error => {
     console.error(error);
     const status = document.querySelector('#status');
     status.textContent = '앱을 불러오지 못했어요. 인터넷 연결을 확인하고 새로고침해 주세요.';

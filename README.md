@@ -27,7 +27,7 @@ python3 -m http.server 8000
 
 - 고해상도 화면에서 캔버스의 CSS 크기와 내부 픽셀 크기를 일치시켜 우하단 치우침·과대 표시를 수정했습니다.
 - 고양이를 작게 정규화하고 화면 전역의 무작위 목적지로 이동시킵니다. 화면 크기 변경과 애니메이션 중에도 모델이 화면 밖으로 나가지 않도록 제한합니다.
-- 단순 사각형 판정 대신 애니메이션 중인 고양이 표면과 손끝의 겹침을 검사합니다. 9px 정도의 손끝 여유를 둡니다.
+- 단순 사각형 판정 대신 애니메이션 중인 고양이 표면과 손끝의 겹침을 검사합니다. 화면 크기에 따라 12~18px의 손끝 여유를 둡니다.
 - 기존 GLB의 Walk, Idle, Idle_Eating 등과 새 휴식 자세를 0.55초에 걸쳐 블렌드합니다.
 - GLB 원본 클립: Death, Headbutt, Idle, Idle_Eating, Jump_Loop, Jump_Start, Run, Walk.
 - 수면/엎드림 전용 원본 클립은 없습니다. Idle 기반으로 다리·머리·꼬리 뼈대와 호흡을 조절하는 RestPose, LiePose, SleepPose를 코드에서 생성합니다. 모델 전체를 납작하게 압축하지 않습니다.
@@ -49,3 +49,5 @@ node --test tests/interaction.test.mjs
 API 참고:
 - https://developers.google.com/edge/mediapipe/solutions/vision/hand_landmarker
 - https://github.com/mrdoob/three.js/blob/dev/docs/pages/SkinnedMesh.html.md
+
+크기 조정: 이전 배포보다 15% 확대했습니다. 각 손끝의 접촉이 0.12초 이내 잠깐 끊기면 유지해 개수 흔들림을 줄입니다. 손 전체가 사라지면 즉시 이 보정을 초기화합니다.

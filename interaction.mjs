@@ -22,3 +22,14 @@ export class ContactGate {
   }
   reset() { this.candidate = this.committed = 0; this.since = 0; }
 }
+
+// Preserve each fingertip through brief tracking gaps, without inventing new contacts.
+export class FingerContactTracker {
+  lastHits = new Map();
+  update(ids, now) {
+    for (const id of ids) this.lastHits.set(id, now);
+    for (const [id, time] of this.lastHits) if (now - time > 120) this.lastHits.delete(id);
+    return [...this.lastHits.keys()];
+  }
+  reset() { this.lastHits.clear(); }
+}

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { contactTips, videoToScreen, ContactGate } from '../interaction.mjs';
+import { contactTips, videoToScreen, ContactGate, FingerContactTracker } from '../interaction.mjs';
 test('one hand independently detects 0–4 fingertips, excluding thumb',()=>{
  for(let n=0;n<=4;n++){
   const lm=Array.from({length:21},()=>({x:-100,y:-100}));lm[4]={x:10,y:10};
@@ -28,4 +28,13 @@ test('brief jitter and lost hands do not trigger a reaction',()=>{
  const gate=new ContactGate();gate.update(1,0);gate.update(3,50);gate.update(0,100);
  assert.equal(gate.update(0,400),null);gate.reset();assert.equal(gate.committed,0);
  assert.deepEqual(contactTips([],p=>p,()=>true),[]);
+});
+
+test('independent contacts survive brief gaps and expire after release',()=>{
+ const tracker=new FingerContactTracker();
+ assert.deepEqual(tracker.update([8,12,16,20],0),[8,12,16,20]);
+ assert.equal(tracker.update([8,12,16],70).length,4);
+ assert.equal(tracker.update([8,12,16],130).length,3);
+ assert.equal(tracker.update([],251).length,0);
+ tracker.update([8],300);tracker.reset();assert.equal(tracker.update([],301).length,0);
 });
