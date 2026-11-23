@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-import { TIP_IDS, videoToScreen, contactTips, gestureCount, ContactGate, FingerContactTracker } from './interaction.mjs?v=6';
+import { TIP_IDS, videoToScreen, contactTips, GestureTracker, ContactGate, FingerContactTracker } from './interaction.mjs?v=7';
 
 const el = Object.fromEntries(['camera','hands','stage','emotion','begin','status'].map(id => [id, document.getElementById(id)]));
 const ctx = el.hands.getContext('2d');
@@ -19,7 +19,10 @@ scene.add(anchor); anchor.add(facing); facing.add(normalized);
 facing.rotation.x = .22;
 let cat, mixer, current, landmarker, stream;
 const actions = {}, meshes = [], bounds = new THREE.Box3(), raycaster = new THREE.Raycaster();
-const fingerContacts = new FingerContactTracker();
+const fingerContacts = new FingerContactTracker(), gestures = new GestureTracker();
+let interactionHold = 0;
+const feedback = document.getElementById("handFeedback");
+const guideRows = [...document.querySelectorAll("#guide li")];
 const gate = new ContactGate(), clock = new THREE.Clock();
 let width = innerWidth, height = innerHeight, mode = 'rest', special = false, elapsed = 0, duration = 2;
 let started = false, starting = false, lastVideoTime = -1, lastDetection = 0, lastAttempt = 0;
@@ -141,7 +144,7 @@ function screenRect() {
 // Empty corners of the projected bounding box do not count as contact.
 function hitsCat(p) {
   if (!cat || p.x<0 || p.x>width || p.y<0 || p.y>height) return false;
-  const r = screenRect(), pad = clamp(catPixels*.1,12,18);
+  const r = screenRect(), pad = clamp(catPixels*.14,16,26);
   if (p.x<r.left-pad || p.x>r.right+pad || p.y<r.top-pad || p.y>r.bottom+pad) return false;
   for (const [dx,dy] of [[0,0],[-pad,0],[pad,0],[0,-pad],[0,pad],[-pad*.7,-pad*.7],[pad*.7,-pad*.7],[-pad*.7,pad*.7],[pad*.7,pad*.7]]) {
     raycaster.setFromCamera(new THREE.Vector2((p.x+dx)/width*2-1,1-(p.y+dy)/height*2),camera);
@@ -166,16 +169,22 @@ function processHands(results, now) {
     if (contacts.length) lastContact = contacts.map(id=>points[id]).reduce((a,p)=>({x:a.x+p.x/contacts.length,y:a.y+p.y/contacts.length}),{x:0,y:0});
   }
   if (!lm) fingerContacts.reset();
-  const count = gestureCount(results.worldLandmarks?.[0] || lm, contacts.length);
+  const raised = gestures.update(results.worldLandmarks?.[0] || lm, now);
+  const count = contacts.length ? raised : 0;
+  if (contacts.length && !special) interactionHold = .35;
+  feedback.textContent = lm ? `손가락 ${raised}개 · ${contacts.length ? '닿았어요' : '고양이에 닿아 주세요'}` : '손을 보여 주세요';
+  guideRows.forEach(row => row.classList.toggle('active',!!lm && Number(row.dataset.count)===raised));
   const reaction = gate.update(count,now);
   if (reaction) setMode(reaction,true);
   return contacts.length;
 }
 function tick(dt) {
   if (!cat) return;
-  elapsed += dt;
+  interactionHold = Math.max(0,interactionHold-dt);
+  const paused = interactionHold>0 && !special;
+  if (!paused) elapsed += dt;
   if (elapsed > duration) chooseAutonomy();
-  if (mode==='walk' || mode==='run') {
+  if (!paused && (mode==='walk' || mode==='run')) {
     const delta = target.clone().sub(position), distance = delta.length();
     if (distance>2) {
       position.addScaledVector(delta.normalize(),Math.min(distance,(mode==='run'?catPixels*1.8:catPixels*.45)*dt));
@@ -188,7 +197,7 @@ function tick(dt) {
   if (mode==='angry' && elapsed>.4) playClip('Jump_Loop');
   const jump = mode==='angry' ? Math.sin(Math.min(elapsed/1.6,1)*Math.PI)*catPixels*.5 : 0;
   anchor.position.set(position.x/height*10,(-position.y+jump)/height*10,0);
-  mixer.update(dt); updateBounds();
+  mixer.update(paused ? 0 : dt); updateBounds();
   // Clamp the animated silhouette too, including jumps and changed poses.
   let r=screenRect();
   const dx = r.left<12 ? 12-r.left : r.right>width-12 ? width-12-r.right : 0;
@@ -206,13 +215,13 @@ function animate() {
     try { processHands(landmarker.detectForVideo(el.camera,now),now); lastDetection=now; }
     catch (error) { console.error(error); stopCamera();showStatus('손 인식이 중단됐어요. 발바닥을 눌러 다시 시작해 주세요.'); }
   }
-  if (started && now-lastDetection>350) { ctx.clearRect(0,0,width,height);gate.reset();fingerContacts.reset(); }
+  if (started && now-lastDetection>350) { ctx.clearRect(0,0,width,height);gate.reset();fingerContacts.reset();gestures.reset();interactionHold=0;feedback.textContent="손을 보여 주세요";guideRows.forEach(row=>row.classList.remove("active")); }
 }
 animate();
 function stopCamera() {
   started=false; stream?.getTracks().forEach(track=>track.stop());stream=null;
   landmarker?.close();landmarker=null;el.camera.srcObject=null;
-  ctx.clearRect(0,0,width,height);gate.reset();fingerContacts.reset();el.begin.style.display='block';el.begin.disabled=false;
+  ctx.clearRect(0,0,width,height);gate.reset();fingerContacts.reset();gestures.reset();interactionHold=0;feedback.textContent="손을 보여 주세요";guideRows.forEach(row=>row.classList.remove("active"));el.begin.style.display='block';el.begin.disabled=false;
 }
 async function start() {
   if (started || starting) return;
@@ -235,7 +244,7 @@ async function start() {
 }
 el.begin.addEventListener('click',start);
 window.addEventListener('pagehide',stopCamera);
-document.addEventListener('visibilitychange',()=>{clock.getDelta();gate.reset();fingerContacts.reset();ctx.clearRect(0,0,width,height);});
+document.addEventListener('visibilitychange',()=>{clock.getDelta();gate.reset();fingerContacts.reset();gestures.reset();interactionHold=0;feedback.textContent="손을 보여 주세요";guideRows.forEach(row=>row.classList.remove("active"));ctx.clearRect(0,0,width,height);});
 // Opt-in test harness; absent during normal use and never enables the camera.
 if (new URLSearchParams(location.search).has('test')) window.catTest = {
   get ready(){return !!cat;}, setMode, tick, processHands, hitsCat, screenRect,

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { contactTips, videoToScreen, ContactGate, FingerContactTracker, extendedFingers, gestureCount } from '../interaction.mjs';
+import { contactTips, videoToScreen, ContactGate, FingerContactTracker, extendedFingers, gestureCount, GestureTracker } from '../interaction.mjs';
 test('one hand independently detects 0–4 fingertips, excluding thumb',()=>{
  for(let n=0;n<=4;n++){
   const lm=Array.from({length:21},()=>({x:-100,y:-100}));lm[4]={x:10,y:10};
@@ -61,4 +61,15 @@ test('extended-finger count survives rotation, mirroring and depth rotation',()=
   for(const transform of [p=>({x:-p.x,y:p.y,z:p.z}),p=>({x:p.y,y:-p.x,z:0}),p=>({x:p.x,y:0,z:p.y})])
    assert.equal(gestureCount(lm.map(transform),1),count);
  }
+});
+
+test('gesture tracker suppresses brief finger flicker but accepts sustained changes',()=>{
+ const tracker=new GestureTracker();
+ assert.equal(tracker.update(hand(4),0),4);
+ assert.equal(tracker.update(hand(3),20),4);
+ assert.equal(tracker.update(hand(4),70),4);
+ assert.equal(tracker.update(hand(3),100),4);
+ assert.equal(tracker.update(hand(3),210),3);
+ assert.equal(tracker.update(null,250),0);
+ assert.equal(tracker.update(hand(1),300),1);
 });

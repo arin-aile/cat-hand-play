@@ -35,7 +35,7 @@ export class FingerContactTracker {
 }
 
 // Joint geometry works for upright, sideways and mirrored hands.
-export function extendedFingers(landmarks) {
+export function extendedFingers(landmarks, previous = []) {
   if (!landmarks || landmarks.length < 21) return [];
   const vector = (a,b) => [b.x-a.x,b.y-a.y,(b.z||0)-(a.z||0)];
   const length = v => Math.hypot(...v);
@@ -45,9 +45,32 @@ export function extendedFingers(landmarks) {
     const a=length(lower), b=length(upper);
     if (a<1e-8 || b<1e-8) return false;
     const alignment=lower.reduce((sum,v,i)=>sum+v*upper[i],0)/(a*b);
-    return alignment>.45 && length(vector(mcp,end))>a*1.35;
+    const held = previous.includes(tip);
+    return alignment>(held ? .1 : .3) && length(vector(mcp,end))>a*(held ? 1.15 : 1.3);
   });
 }
 export function gestureCount(landmarks, contactCount) {
   return contactCount>0 ? extendedFingers(landmarks).length : 0;
+}
+
+// Per-finger hysteresis and temporal confirmation stop one noisy joint changing the gesture.
+export class GestureTracker {
+  stable = []; pending = new Map(); initialized = false;
+  update(landmarks, now) {
+    if (!landmarks || landmarks.length<21) { this.reset(); return 0; }
+    const next=extendedFingers(landmarks,this.stable);
+    if (!this.initialized) { this.stable=next; this.initialized=true; }
+    for (const tip of TIP_IDS) {
+      const desired=next.includes(tip), current=this.stable.includes(tip);
+      if (desired===current) { this.pending.delete(tip); continue; }
+      const pending=this.pending.get(tip);
+      if (!pending || pending.desired!==desired) this.pending.set(tip,{desired,since:now});
+      else if (now-pending.since>=100) {
+        this.stable=desired ? [...this.stable,tip] : this.stable.filter(id=>id!==tip);
+        this.pending.delete(tip);
+      }
+    }
+    return this.stable.length;
+  }
+  reset() { this.stable=[];this.pending.clear();this.initialized=false; }
 }
